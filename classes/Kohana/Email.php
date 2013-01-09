@@ -52,17 +52,18 @@ class Kohana_Email {
 			if ($config === NULL)
 			{
 				// Load the configuration for this email instance
-				$config = Kohana::$config->load('email')->$name;
+				$config = Kohana::$config->load('email')
+					->as_array();
 			}
 
-			if ( ! isset($config['type']))
+			if ( ! isset($config[$name]))
 			{
-				throw new Kohana_Exception('Email type not defined in :name configuration',
+				throw new Kohana_Exception(':name configuration is not defined',
 					array(':name' => $name));
 			}
 
 			// Store the email instance
-			Email::$instances[$name] = new Email($name, $config);
+			Email::$instances[$name] = new Email($name, $config[$name]);
 		}
 
 		return Email::$instances[$name];
@@ -96,6 +97,12 @@ class Kohana_Email {
 	 */
 	public function __construct($name, array $config)
 	{
+		if ( ! class_exists('Swift_Mailer', FALSE))
+		{
+			// Load SwiftMailer
+			require Kohana::find_file('vendor', 'swiftmailer/lib/swift_required');
+		}
+
 		// Set the instance name
 		$this->_instance = $name;
 
@@ -118,8 +125,8 @@ class Kohana_Email {
 				}
 
 				// Do authentication, if part of the DSN
-				empty($config['options']['username']) or $transport->setUsername($config['options']['username']);
-				empty($config['options']['password']) or $transport->setPassword($config['options']['password']);
+				empty($config['options']['username']) OR $transport->setUsername($config['options']['username']);
+				empty($config['options']['password']) OR $transport->setPassword($config['options']['password']);
 
 				// Set the timeout to 5 seconds
 				$transport->setTimeout(empty($config['options']['timeout']) ? 5 : (int) $config['options']['timeout']);
@@ -144,12 +151,13 @@ class Kohana_Email {
 	/**
 	 * Specifies the email sender
 	 *
-	 * @param  mixed $from
-	 * @return Email
+	 * @param   string  $email
+	 * @param   string  $name
+	 * @return  Email
 	 */
-	public function from($from)
+	public function from($email, $name = NULL)
 	{
-		$this->_from = $from;
+		$this->_from = (empty($name)) ? $email : array($email => $name);
 
 		return $this;
 	}
@@ -164,12 +172,20 @@ class Kohana_Email {
 	/**
 	 * Adds a recipient
 	 *
-	 * @param  mixed $to
-	 * @return Email
+	 * @param   string  $email
+	 * @param   string  $name
+	 * @return  Email
 	 */
-	public function to($to)
+	public function to($email, $name = NULL)
 	{
-		$this->_to[] = $to;
+		if (empty($name))
+		{
+			$this->_to[] = $email;
+		}
+		else
+		{
+			$this->_to[$email] = $name;
+		}
 
 		return $this;
 	}
@@ -184,12 +200,20 @@ class Kohana_Email {
 	/**
 	 * Adds a recipient
 	 *
-	 * @param  mixed $to
-	 * @return Email
+	 * @param   string  $email
+	 * @param   string  $name
+	 * @return  Email
 	 */
-	public function cc($cc)
+	public function cc($email, $name = NULL)
 	{
-		$this->_cc[] = $cc;
+		if (empty($name))
+		{
+			$this->_cc[] = $email;
+		}
+		else
+		{
+			$this->_cc[$email] = $name;
+		}
 
 		return $this;
 	}
@@ -204,12 +228,20 @@ class Kohana_Email {
 	/**
 	 * Adds a recipient
 	 *
-	 * @param  mixed $to
-	 * @return Email
+	 * @param   string  $email
+	 * @param   string  $name
+	 * @return  Email
 	 */
-	public function bcc($bcc)
+	public function bcc($email, $name = NULL)
 	{
-		$this->_bcc[] = $bcc;
+		if (empty($name))
+		{
+			$this->_bcc[] = $email;
+		}
+		else
+		{
+			$this->_bcc[$email] = $name;
+		}
 
 		return $this;
 	}
@@ -278,13 +310,33 @@ class Kohana_Email {
 
 		foreach (array('to', 'cc', 'bcc') as $param)
 		{
-			$method = 'set'.UTF8::ucfirst($param);
+			if (sizeof($this->{'_'.$param}) > 0)
+			{
+				$method = 'set'.UTF8::ucfirst($param);
 
-			$message->$method($this->{'_'.$param});
+				$message->$method($this->{'_'.$param});
+			}
 		}
 
 		// Send message
 		$this->_connection->send($message);
+
+		return $this;
+	}
+
+	/**
+	 * Reset all recipients (to, cc, bcc rows)
+	 *
+	 * @return Email
+	 */
+	public function reset()
+	{
+		foreach (array('to', 'cc', 'bcc') as $param)
+		{
+			$this->{'_'.$param} = array();
+		}
+
+		return $this;
 	}
 
 } // End Kohana_Email
