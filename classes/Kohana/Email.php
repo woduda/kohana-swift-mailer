@@ -163,6 +163,27 @@ class Kohana_Email {
 	}
 
 	/**
+	 * Reply-to data
+	 *
+	 * @var mixed
+	 */
+	protected $_reply_to;
+
+	/**
+	 * Specifies the reply-to field
+	 *
+	 * @param   string  $email
+	 * @param   string  $name
+	 * @return  Email
+	 */
+	public function reply_to($email, $name = NULL)
+	{
+		$this->_reply_to = (empty($name)) ? $email : array($email => $name);
+
+		return $this;
+	}
+
+	/**
 	 * Array of receivers
 	 *
 	 * @var array
@@ -316,6 +337,11 @@ class Kohana_Email {
 
 				$message->$method($this->{'_'.$param});
 			}
+		}
+
+		if ( ! empty($this->_reply_to))
+		{
+			$message->setReplyTo($this->_reply_to);
 		}
 
 		// Send message
